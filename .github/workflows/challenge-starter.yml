@@ -66,6 +66,10 @@ jobs:
           $reference = Join-Path $env:GITHUB_WORKSPACE 'catalog\reference-solutions\request-validation'
           Copy-Item (Join-Path $reference 'Program.cs') -Destination (Join-Path $api 'Program.cs') -Force
           Copy-Item (Join-Path $reference 'ProductInput.cs') -Destination (Join-Path $api 'ProductInput.cs') -Force
+          # The catalog files were written before the starter build, and Copy-Item
+          # keeps those timestamps. MSBuild would then treat the starter output as
+          # newer and skip compiling the reference solution.
+          Get-ChildItem $api -Filter *.cs | ForEach-Object { $_.LastWriteTime = Get-Date }
       - name: Confirm the reference solution passes
         shell: pwsh
         run: |
