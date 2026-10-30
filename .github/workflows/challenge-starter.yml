@@ -32,6 +32,7 @@ jobs:
       - name: Confirm the starter fails and names each effect
         shell: pwsh
         run: |
+          $PSNativeCommandUseErrorActionPreference = $false
           $solution = Join-Path $env:GITHUB_WORKSPACE 'request-validation\RequestValidation.sln'
           $output = & dotnet test $solution --logger 'console;verbosity=normal' 2>&1
           $exitCode = $LASTEXITCODE
@@ -54,6 +55,10 @@ jobs:
               throw "Expected test result '$result' was not reported."
             }
           }
+
+          # The starter is expected to fail. The Actions pwsh wrapper otherwise
+          # exits with that leftover native code and fails the step.
+          $global:LASTEXITCODE = 0
       - name: Apply the reference solution from the catalog repository
         shell: pwsh
         run: |
