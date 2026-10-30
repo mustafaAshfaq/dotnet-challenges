@@ -16,10 +16,16 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/checkout@v4
-        with:
-          repository: BirotySols/dotnet-challenges-site
-          path: catalog
+      - name: Checkout the public catalog
+        shell: pwsh
+        env:
+          GIT_TERMINAL_PROMPT: "0"
+        run: |
+          # The job token can read this repository only. actions/checkout sends
+          # that token anyway, and GitHub then hides the catalog's refs, so the
+          # fetch fails with "couldn't find remote ref refs/heads/main" even
+          # though the catalog is public. Clone it without credentials.
+          git -c credential.helper= -c http.extraheader= clone --depth 1 --branch main https://github.com/BirotySols/dotnet-challenges-site.git catalog
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
