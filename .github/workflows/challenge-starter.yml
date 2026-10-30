@@ -1,0 +1,65 @@
+name: Maintainer check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  request-validation:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: BirotySols/dotnet-challenges-site
+          path: catalog
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Confirm the starter fails and names each effect
+        shell: pwsh
+        run: |
+          $solution = Join-Path $env:GITHUB_WORKSPACE 'request-validation\RequestValidation.sln'
+          $output = & dotnet test $solution --logger 'console;verbosity=normal' 2>&1
+          $exitCode = $LASTEXITCODE
+          $output | ForEach-Object { Write-Host $_ }
+
+          if ($exitCode -eq 0) {
+            throw 'The naive starter passed; the challenge must fail until its effects are implemented.'
+          }
+
+          $log = $output -join "`n"
+          $requiredResults = @(
+            'Whitespace_name_with_quantity_0_returns_400_and_stores_nothing',
+            'Empty_name_with_quantity_101_returns_400_and_stores_nothing',
+            'Valid_create_and_replace_keep_success_statuses_and_invalid_replace_preserves_product',
+            'Unknown_product_returns_404'
+          )
+
+          foreach ($result in $requiredResults) {
+            if (-not $log.Contains($result)) {
+              throw "Expected test result '$result' was not reported."
+            }
+          }
+      - name: Apply the reference solution from the catalog repository
+        shell: pwsh
+        run: |
+          $api = Join-Path $env:GITHUB_WORKSPACE 'request-validation\RequestValidation.Api'
+          $reference = Join-Path $env:GITHUB_WORKSPACE 'catalog\reference-solutions\request-validation'
+          Copy-Item (Join-Path $reference 'Program.cs') -Destination (Join-Path $api 'Program.cs') -Force
+          Copy-Item (Join-Path $reference 'ProductInput.cs') -Destination (Join-Path $api 'ProductInput.cs') -Force
+      - name: Confirm the reference solution passes
+        shell: pwsh
+        run: |
+          $solution = Join-Path $env:GITHUB_WORKSPACE 'request-validation\RequestValidation.sln'
+          & dotnet test $solution --logger 'console;verbosity=minimal'
+          if ($LASTEXITCODE -ne 0) {
+            throw 'The reference solution did not satisfy the challenge harness.'
+          }

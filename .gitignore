@@ -145,5 +145,11 @@ vite.config.ts.timestamp-*
 # Astro generated types
 .astro/
 
+# .NET build outputs
+**/bin/
+**/obj/
+**/TestResults/
+.vs/
+
 # Turbo Repo
 .turbo
