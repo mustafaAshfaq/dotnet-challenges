@@ -1,0 +1,19 @@
+## Product Validation Tests
+@BASE_URL = http://localhost:5245
+### Create Product with Invalid Name
+POST {{BASE_URL}}/products
+Content-Type: application/json
+
+{
+    "name": "",
+    "quantity": 0
+}
+
+### Create Product with Invalid Quantity
+POST {{BASE_URL}}/products
+Content-Type: application/json
+
+{
+    "name": "Valid Name",
+    "quantity": 0
+}
