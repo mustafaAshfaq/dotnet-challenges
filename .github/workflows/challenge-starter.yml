@@ -78,3 +78,79 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
             throw 'The reference solution did not satisfy the challenge harness.'
           }
+
+  input-trust:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Checkout the public catalog
+        shell: pwsh
+        env:
+          GIT_TERMINAL_PROMPT: "0"
+        run: |
+          # The job token can read this repository only. actions/checkout sends
+          # that token anyway, and GitHub then hides the catalog's refs, so the
+          # fetch fails with "couldn't find remote ref refs/heads/main" even
+          # though the catalog is public. Clone it without credentials.
+          git -c credential.helper= -c http.extraheader= clone --depth 1 --branch main https://github.com/BirotySols/dotnet-challenges-site.git catalog
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Confirm the starter fails and names each effect
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $false
+          $solution = Join-Path $env:GITHUB_WORKSPACE 'input-trust\InputTrust.sln'
+          $output = & dotnet test $solution --logger 'console;verbosity=normal' 2>&1
+          $exitCode = $LASTEXITCODE
+          $output | ForEach-Object { Write-Host $_ }
+
+          if ($exitCode -eq 0) {
+            throw 'The naive starter passed; the challenge must fail until its effects are implemented.'
+          }
+
+          $log = $output -join "`n"
+          $requiredResults = @(
+            'Create_with_sent_price_stores_title_and_keeps_price_at_20',
+            'Create_without_price_stores_title_and_keeps_price_at_20',
+            'Replace_with_sent_price_stores_title_and_keeps_price_at_20',
+            'Replace_without_price_stores_title_and_keeps_price_at_20',
+            'POST /listings with { "title": "Lamp", "price": 1 } must return JSON whose title is "Lamp" and whose price is 20, with an id.',
+            'POST /listings with { "title": "Lamp" } must return 201 with title "Lamp" and price 20.',
+            'PUT /listings/{id} with { "title": "Shade", "price": 1 } must store title "Shade" and price 20.',
+            'PUT /listings/{id} with { "title": "Shade" } must store title "Shade" and price 20.'
+          )
+
+          foreach ($result in $requiredResults) {
+            if (-not $log.Contains($result)) {
+              throw "Expected test result '$result' was not reported."
+            }
+          }
+
+          # The starter is expected to fail. The Actions pwsh wrapper otherwise
+          # exits with that leftover native code and fails the step.
+          $global:LASTEXITCODE = 0
+      - name: Apply the reference solution from the catalog repository
+        shell: pwsh
+        run: |
+          $api = Join-Path $env:GITHUB_WORKSPACE 'input-trust\InputTrust.Api'
+          $reference = Join-Path $env:GITHUB_WORKSPACE 'catalog\reference-solutions\input-trust'
+          Copy-Item (Join-Path $reference 'Program.cs') -Destination (Join-Path $api 'Program.cs') -Force
+          Copy-Item (Join-Path $reference 'Listing.cs') -Destination (Join-Path $api 'Listing.cs') -Force
+          Copy-Item (Join-Path $reference 'ListingStore.cs') -Destination (Join-Path $api 'ListingStore.cs') -Force
+          # The catalog files were written before the starter build, and Copy-Item
+          # keeps those timestamps. MSBuild would then treat the starter output as
+          # newer and skip compiling the reference solution.
+          Get-ChildItem $api -Filter *.cs | ForEach-Object { $_.LastWriteTime = Get-Date }
+      - name: Confirm the reference solution passes
+        shell: pwsh
+        run: |
+          $solution = Join-Path $env:GITHUB_WORKSPACE 'input-trust\InputTrust.sln'
+          & dotnet test $solution --logger 'console;verbosity=minimal'
+          if ($LASTEXITCODE -ne 0) {
+            throw 'The reference solution did not satisfy the challenge harness.'
+          }
