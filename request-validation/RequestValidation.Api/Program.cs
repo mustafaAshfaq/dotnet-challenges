@@ -1,6 +1,8 @@
 using RequestValidation.Api;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddValidation();
+builder.Services.AddProblemDetails();
 builder.Services.AddSingleton<ProductStore>();
 
 var app = builder.Build();
